@@ -1,5 +1,6 @@
 import ipaddress
 import re
+from pathlib import Path
 
 
 def is_valid_ip(target: str) -> bool:
@@ -82,3 +83,15 @@ def is_safe_target(target: str, allow_public: bool = False) -> tuple[bool, str]:
         return True, "Valid hostname."
 
     return False, "Target format not recognized as valid IP, subnet, or internal hostname."
+
+
+def is_safe_filepath(base_directory: Path, user_path: str) -> tuple[bool, Path | None, str]:
+    """Prevent directory traversal attacks."""
+    try:
+        resolved_base = base_directory.resolve()
+        target_path = (base_directory / user_path).resolve()
+        if not str(target_path).startswith(str(resolved_base)):
+            return False, None, "Directory traversal detected."
+        return True, target_path, "Safe path."
+    except Exception as e:
+        return False, None, f"Path resolution error: {e}"
