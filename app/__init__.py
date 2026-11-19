@@ -44,12 +44,18 @@ def create_app(config_name: str | None = None) -> Flask:
     def load_user(user_id: str):
         return db.session.get(User, int(user_id))
 
-    # Register blueprints
-    from app.routes.auth import auth_bp
-    from app.routes.dashboard import dashboard_bp
+    # Register blueprints safely as they are implemented
+    try:
+        from app.routes.auth import auth_bp
+        app.register_blueprint(auth_bp)
+    except ImportError:
+        pass
 
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(dashboard_bp)
+    try:
+        from app.routes.dashboard import dashboard_bp
+        app.register_blueprint(dashboard_bp)
+    except ImportError:
+        pass
 
     # Error handlers
     @app.errorhandler(404)
