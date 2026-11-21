@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}System Error{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5 text-center">
+    <div class="col-md-6">
+        <i class="bi bi-shield-x display-1 text-danger opacity-75 mb-3"></i>
+        <h1 class="display-5 fw-bold text-danger">500</h1>
+        <h2 class="h4 mb-3">Internal Auditing Engine Error</h2>
+        <p class="text-secondary mb-4">
+            An unexpected error occurred during execution. The current database transaction has been safely rolled back. Check application logs for diagnostic details.
+        </p>
+        <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-cyber px-4">
+            <i class="bi bi-arrow-left me-1"></i> Return to Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}
