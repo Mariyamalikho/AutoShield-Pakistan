@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}Scan Results — Network Auditor — AutoShield{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <div class="module-icon-wrap bg-primary bg-opacity-10 rounded-3 p-3">
+      <i class="bi bi-hdd-network fs-3 text-primary"></i>
+    </div>
+    <div>
+      <h1 class="h3 mb-0 fw-semibold">Scan Results</h1>
+      <p class="text-muted mb-0 small">
+        Target: <code>{{ target }}</code>
+        {% if resolved and resolved != target %}
+          → <code>{{ resolved }}</code>
+        {% endif %}
+        &nbsp;·&nbsp;
+        {{ "Host scan" if scan_mode == "host" else "Subnet sweep" }}
+        &nbsp;·&nbsp;
+        Scan #{{ scan_id }}
+      </p>
+    </div>
+    <div class="ms-auto">
+      <a href="{{ url_for('network.index') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>New Scan
+      </a>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  {% set open_results = results | selectattr("state", "equalto", "open") | list %}
+  {% set critical_count = open_results | selectattr("severity", "equalto", "CRITICAL") | list | length %}
+  {% set high_count = open_results | selectattr("severity", "equalto", "HIGH") | list | length %}
+  {% set medium_count = open_results | selectattr("severity", "equalto", "MEDIUM") | list | length %}
+  {% set low_count = open_results | selectattr("severity", "in", ["LOW", "INFO"]) | list | length %}
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div class="fs-2 fw-bold text-info">{{ open_results | length }}</div>
+        <div class="small text-muted">Open Ports</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div class="fs-2 fw-bold text-danger">{{ critical_count }}</div>
+        <div class="small text-muted">Critical</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div class="fs-2 fw-bold text-warning">{{ high_count }}</div>
+        <div class="small text-muted">High</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div class="fs-2 fw-bold text-primary">{{ medium_count + low_count }}</div>
+        <div class="small text-muted">Med / Low</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results table -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center gap-3">
+      <h5 class="mb-0 fw-semibold">
+        <i class="bi bi-table me-2 text-primary"></i>Findings
+      </h5>
+      <!-- Severity filter -->
+      <div class="ms-auto d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-secondary active" onclick="filterSeverity('all', this)">All</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="filterSeverity('CRITICAL', this)">Critical</button>
+        <button class="btn btn-sm btn-outline-warning" onclick="filterSeverity('HIGH', this)">High</button>
+        <button class="btn btn-sm btn-outline-primary" onclick="filterSeverity('MEDIUM', this)">Medium</button>
+        <button class="btn btn-sm btn-outline-success" onclick="filterSeverity('LOW', this)">Low</button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      {% if results %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="resultsTable">
+          <thead class="table-dark">
+            <tr>
+              {% if scan_mode == "subnet" %}
+              <th class="ps-3">Host</th>
+              {% endif %}
+              <th {% if scan_mode != "subnet" %}class="ps-3"{% endif %}>Port</th>
+              <th>Service</th>
+              <th>State</th>
+              <th>Risk</th>
+              <th>Score</th>
+              <th>RTT (ms)</th>
+              <th>Explanation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in results %}
+            {% if r.state != "skipped" %}
+            <tr data-severity="{{ r.get('severity', 'INFO') if r.state == 'open' else 'INFO' }}">
+              {% if scan_mode == "subnet" %}
+              <td class="ps-3 font-monospace small text-info">{{ r.get('host', '—') }}</td>
+              {% endif %}
+              <td {% if scan_mode != "subnet" %}class="ps-3"{% endif %}>
+                <span class="font-monospace fw-semibold">{{ r.port }}</span>
+              </td>
+              <td>{{ r.service or '—' }}</td>
+              <td>
+                {% if r.state == "open" %}
+                  <span class="badge bg-success">open</span>
+                {% elif r.state == "closed" %}
+                  <span class="badge bg-secondary">closed</span>
+                {% else %}
+                  <span class="badge bg-dark">filtered</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if r.state == "open" %}
+                  {% set sev = r.get('severity', 'INFO') %}
+                  {% if sev == "CRITICAL" %}
+                    <span class="badge bg-danger">CRITICAL</span>
+                  {% elif sev == "HIGH" %}
+                    <span class="badge bg-warning text-dark">HIGH</span>
+                  {% elif sev == "MEDIUM" %}
+                    <span class="badge bg-primary">MEDIUM</span>
+                  {% elif sev == "LOW" %}
+                    <span class="badge bg-success">LOW</span>
+                  {% else %}
+                    <span class="badge bg-secondary">INFO</span>
+                  {% endif %}
+                {% else %}
+                  <span class="badge bg-secondary">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if r.state == "open" %}
+                  <span class="fw-semibold text-{{ 'danger' if r.get('risk_score', 0) >= 80 else ('warning' if r.get('risk_score', 0) >= 50 else 'success') }}">
+                    {{ r.get('risk_score', 0) }}
+                  </span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td class="text-muted small">{{ r.response_time_ms }}</td>
+              <td class="small" style="max-width:320px;">
+                {% if r.state == "open" and r.get('explanation') %}
+                  <span class="d-inline-block text-truncate" style="max-width:300px;"
+                        title="{{ r.explanation }}">{{ r.explanation }}</span>
+                  {% if r.get('banner') %}
+                    <br><span class="font-monospace text-info small">{{ r.banner }}</span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            <!-- Remediation row (collapsed) -->
+            {% if r.state == "open" and r.get('remediation_hint') %}
+            <tr class="table-secondary small" data-severity="{{ r.get('severity', 'INFO') }}">
+              {% if scan_mode == "subnet" %}<td></td>{% endif %}
+              <td colspan="7" class="ps-3 py-2 text-muted">
+                <i class="bi bi-tools me-1 text-info"></i>
+                <strong>Remediation:</strong> {{ r.remediation_hint }}
+              </td>
+            </tr>
+            {% endif %}
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-shield-check fs-1 opacity-25 d-block mb-2 text-success"></i>
+        <strong>No open ports detected</strong> on the scanned port profile.
+        <br>
+        <span class="small">This does not guarantee the host is fully secure — only the listed ports were tested.</span>
+      </div>
+      {% endif %}
+    </div>
+  </div><!-- /card -->
+
+</div><!-- /container -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterSeverity(sev, btn) {
+  document.querySelectorAll('.btn-group-filter .btn, [onclick^="filterSeverity"]').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+
+  document.querySelectorAll('#resultsTable tbody tr').forEach(function(row) {
+    if (sev === 'all') {
+      row.style.display = '';
+    } else {
+      row.style.display = (row.dataset.severity === sev) ? '' : 'none';
+    }
+  });
+}
+</script>
+{% endblock %}
