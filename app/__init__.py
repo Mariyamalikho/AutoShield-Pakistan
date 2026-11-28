@@ -57,6 +57,12 @@ def create_app(config_name: str | None = None) -> Flask:
     except ImportError:
         pass
 
+    try:
+        from app.routes.network import network_bp
+        app.register_blueprint(network_bp)
+    except ImportError:
+        pass
+
     # Error handlers
     @app.errorhandler(404)
     def not_found_error(error):

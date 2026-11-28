@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block title %}Network Security Auditor — AutoShield{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+
+  <!-- Page header -->
+  <div class="d-flex align-items-center mb-4 gap-3">
+    <div class="module-icon-wrap bg-primary bg-opacity-10 rounded-3 p-3">
+      <i class="bi bi-hdd-network fs-3 text-primary"></i>
+    </div>
+    <div>
+      <h1 class="h3 mb-0 fw-semibold">Network Security Auditor</h1>
+      <p class="text-muted mb-0 small">
+        Scan authorised hosts and subnets for open ports and misconfigurations.
+      </p>
+    </div>
+  </div>
+
+  <!-- Alert strip -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="row g-4">
+
+    <!-- ----------------------------------------------------------------- -->
+    <!-- Scan form                                                          -->
+    <!-- ----------------------------------------------------------------- -->
+    <div class="col-lg-5">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h5 class="mb-0 fw-semibold">
+            <i class="bi bi-search me-2 text-primary"></i>New Scan
+          </h5>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('network.scan') }}" id="scanForm">
+            {{ csrf_token() if csrf_token is defined }}
+
+            <!-- Scan mode toggle -->
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Scan Mode</label>
+              <div class="btn-group w-100" role="group" aria-label="Scan mode">
+                <input type="radio" class="btn-check" name="scan_mode" id="modeHost"
+                       value="host" checked>
+                <label class="btn btn-outline-primary" for="modeHost">
+                  <i class="bi bi-pc-display me-1"></i>Single Host
+                </label>
+                <input type="radio" class="btn-check" name="scan_mode" id="modeSubnet"
+                       value="subnet">
+                <label class="btn btn-outline-primary" for="modeSubnet">
+                  <i class="bi bi-diagram-3 me-1"></i>Subnet Sweep
+                </label>
+              </div>
+            </div>
+
+            <!-- Target -->
+            <div class="mb-3">
+              <label for="target" class="form-label fw-semibold">
+                Target <span class="text-danger">*</span>
+              </label>
+              <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary">
+                  <i class="bi bi-bullseye text-primary"></i>
+                </span>
+                <input type="text" class="form-control" id="target" name="target"
+                       placeholder="192.168.1.1  or  192.168.1.0/24"
+                       autocomplete="off" required>
+              </div>
+              <div id="targetHelp" class="form-text">
+                Single host: IP address or hostname.&nbsp;
+                Subnet: RFC 1918 CIDR only (e.g. <code>192.168.1.0/24</code>).
+              </div>
+            </div>
+
+            <!-- Timeout -->
+            <div class="mb-3">
+              <label for="timeout" class="form-label fw-semibold">
+                Connection Timeout (seconds)
+              </label>
+              <select class="form-select" id="timeout" name="timeout">
+                <option value="0.5">0.5 s — fast (LAN)</option>
+                <option value="1.0" selected>1.0 s — balanced</option>
+                <option value="2.0">2.0 s — thorough</option>
+                <option value="3.0">3.0 s — slow links</option>
+              </select>
+            </div>
+
+            <!-- Authorization -->
+            <div class="mb-4 p-3 rounded-2 border border-warning bg-warning bg-opacity-10">
+              <div class="form-check">
+                <input class="form-check-input border-warning" type="checkbox"
+                       id="authorised" name="authorised" value="1" required>
+                <label class="form-check-label fw-semibold small" for="authorised">
+                  I confirm that I am <strong>authorised</strong> to scan this target.
+                  Unauthorised port scanning may be illegal in your jurisdiction.
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 fw-semibold"
+                    id="scanBtn">
+              <i class="bi bi-play-circle me-2"></i>Start Scan
+            </button>
+          </form>
+        </div><!-- /card-body -->
+      </div><!-- /card -->
+    </div><!-- /col -->
+
+    <!-- ----------------------------------------------------------------- -->
+    <!-- Port reference & history                                           -->
+    <!-- ----------------------------------------------------------------- -->
+    <div class="col-lg-7">
+
+      <!-- Port catalogue -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h5 class="mb-0 fw-semibold">
+            <i class="bi bi-list-ul me-2 text-info"></i>Monitored Ports
+          </h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead class="table-dark">
+                <tr>
+                  <th class="ps-3">Port</th>
+                  <th>Service</th>
+                  <th>Port</th>
+                  <th>Service</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% set ports_list = common_ports.items() | list %}
+                {% for i in range(0, ports_list|length, 2) %}
+                <tr>
+                  <td class="ps-3 font-monospace text-info">{{ ports_list[i][0] }}</td>
+                  <td>{{ ports_list[i][1] }}</td>
+                  {% if i + 1 < ports_list|length %}
+                  <td class="font-monospace text-info">{{ ports_list[i+1][0] }}</td>
+                  <td>{{ ports_list[i+1][1] }}</td>
+                  {% else %}
+                  <td colspan="2"></td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent host scans -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h5 class="mb-0 fw-semibold">
+            <i class="bi bi-clock-history me-2 text-secondary"></i>Recent Scans
+          </h5>
+        </div>
+        <div class="card-body p-0">
+          {% if recent_scans or subnet_scans %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 align-middle">
+              <thead class="table-dark">
+                <tr>
+                  <th class="ps-3">Target</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in (recent_scans + subnet_scans)|sort(attribute='started_at', reverse=True) %}
+                <tr>
+                  <td class="ps-3 font-monospace small">{{ s.target }}</td>
+                  <td>
+                    <span class="badge bg-primary bg-opacity-25 text-primary">
+                      {{ "Host" if s.scan_type == "network_host" else "Subnet" }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge
+                      {{ 'bg-success' if s.status == 'completed' else 'bg-warning text-dark' }}">
+                      {{ s.status }}
+                    </span>
+                  </td>
+                  <td class="small text-muted">
+                    {{ s.started_at.strftime('%d %b %Y %H:%M') if s.started_at else '—' }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-hdd-network fs-1 opacity-25 d-block mb-2"></i>
+            No scans yet. Run your first scan above.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div><!-- /col -->
+  </div><!-- /row -->
+</div><!-- /container -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Update placeholder text based on selected scan mode
+document.querySelectorAll('input[name="scan_mode"]').forEach(function(radio) {
+  radio.addEventListener('change', function() {
+    var inp = document.getElementById('target');
+    var help = document.getElementById('targetHelp');
+    if (this.value === 'subnet') {
+      inp.placeholder = '192.168.1.0/24';
+      help.innerHTML = 'Enter a private (RFC 1918) CIDR block. Maximum 256 hosts.';
+    } else {
+      inp.placeholder = '192.168.1.1  or  hostname.local';
+      help.innerHTML = 'Single host: IP address or hostname.';
+    }
+  });
+});
+
+// Disable button on submit to prevent double-click
+document.getElementById('scanForm').addEventListener('submit', function() {
+  var btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Scanning…';
+});
+</script>
+{% endblock %}
